@@ -41,7 +41,7 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        suggested_display_precision=1,
+        suggested_display_precision=2,
         value_fn=lambda state: state.voltage.voltage if state.voltage.voltage > 0 else None,
     ),
     WhiskerSensorEntityDescription(
@@ -50,7 +50,7 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        suggested_display_precision=1,
+        suggested_display_precision=2,
         value_fn=lambda state: state.voltage.voltage_hi if state.voltage.voltage_hi > 0 else None,
     ),
     WhiskerSensorEntityDescription(
@@ -59,7 +59,7 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        suggested_display_precision=1,
+        suggested_display_precision=2,
         value_fn=lambda state: state.voltage.voltage_lo if state.voltage.voltage_lo > 0 else None,
     ),
     WhiskerSensorEntityDescription(
@@ -68,7 +68,7 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.VOLTAGE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
-        suggested_display_precision=1,
+        suggested_display_precision=2,
         entity_registry_enabled_default=False,
         value_fn=lambda state: state.voltage.average_peaks_max if state.voltage.average_peaks_max > 0 else None,
     ),
