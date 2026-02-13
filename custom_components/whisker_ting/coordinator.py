@@ -74,8 +74,8 @@ class WhiskerDataUpdateCoordinator(DataUpdateCoordinator[dict[str, DeviceState]]
             return
 
         # Get api_key and user_id from the client
-        api_key = self.client._api_key
-        user_id = self.client._user_id
+        api_key = self.client.api_key
+        user_id = self.client.user_id
 
         if not api_key or not user_id:
             _LOGGER.debug("No api_key or user_id, skipping WebSocket connection")

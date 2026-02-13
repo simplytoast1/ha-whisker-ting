@@ -191,7 +191,7 @@ class CognitoSRP:
         srp_b_hex = challenge_parameters["SRP_B"]
         secret_block_b64 = challenge_parameters["SECRET_BLOCK"]
 
-        timestamp = get_cognito_formatted_timestamp(datetime.datetime.utcnow())
+        timestamp = get_cognito_formatted_timestamp(datetime.datetime.now(datetime.UTC))
 
         hkdf = self.get_password_authentication_key(
             user_id_for_srp,
