@@ -11,19 +11,19 @@ pytest-homeassistant-custom-component==0.13.348
 # rewrites tests/snapshots/*.ambr even when nothing about the integration
 # changed -- review such diffs for entity_id/unique_id churn, which would be
 # a real regression, versus pure representation changes, which are not.
-syrupy==5.3.2
+syrupy==6.0.0
 
 # Runtime requirement from custom_components/whisker_ting/manifest.json
 # (msgpack>=1.0.0; pinned exactly here for test reproducibility).
 # HA normally installs manifest requirements itself; PHACC's test harness does
 # not, so it's listed here too -- importing custom_components.whisker_ting.api
 # otherwise fails at collection time via __init__ -> coordinator -> websocket.
-msgpack==1.2.1
+msgpack==1.2.2
 
 # Linter/formatter -- PINNED so CI matches local exactly. The workflow
 # previously installed an unpinned "ruff", which pulled a newer release that
 # enabled a lint rule the local ruff didn't, breaking CI while local passed.
-ruff==0.16.1
+ruff==0.16.5
 
 # NOTE: aioresponses was removed in favour of Home Assistant's own
 # `aioclient_mock` fixture. aioresponses cannot construct a ClientResponse on
