@@ -30,3 +30,9 @@ config/*
 
 # HACS integration (installed during testing)
 custom_components/hacs/
+
+# Test / coverage artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml

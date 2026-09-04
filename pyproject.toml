@@ -1,0 +1,39 @@
+[tool.ruff]
+target-version = "py313"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+    "A001", "ASYNC", "B", "BLE", "C4", "COM818", "D", "DTZ", "E", "F", "FLY",
+    "G", "I", "ICN001", "INP", "ISC", "LOG", "N", "PERF", "PGH", "PIE", "PL",
+    "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "SLOT", "T20", "TC",
+    "TID", "TRY", "UP", "W",
+]
+ignore = [
+    "D202", "D203", "D213", "E501",
+    "PLR0911", "PLR0912", "PLR0913", "PLR0915", "PLR0917", "PLR2004",
+    "TRY003", "TRY400", "COM812", "ISC001",
+]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+combine-as-imports = true
+known-first-party = ["homeassistant", "custom_components"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "SLF", "PLR2004", "S101", "INP001"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "pep257"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.coverage.run]
+source = ["custom_components/whisker_ting"]
+
+[tool.coverage.report]
+show_missing = true
+exclude_lines = ["raise NotImplementedError", "if TYPE_CHECKING:"]

@@ -1,0 +1,67 @@
+# Dependabot is tuned for LOW NOTIFICATION VOLUME, not for freshness.
+# Upstream releases ~52 times a quarter across these five packages; ungrouped
+# weekly checks would mean roughly one pull request every other day. The
+# settings below collapse that into at most three per month.
+version: 2
+updates:
+  # GitHub Actions move rarely, so a weekly check produces a pull request only
+  # when something actually shipped. Minor and patch bumps are grouped; a major
+  # bump (e.g. actions/checkout v5 -> v6) deliberately arrives on its own so it
+  # gets looked at rather than swept in with routine noise.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+    groups:
+      github-actions-minor:
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Python test dependencies (requirements_test.txt). Monthly, because none of
+  # these are security-sensitive at runtime -- the integration itself only
+  # requires msgpack, and that comes from manifest.json, which Dependabot does
+  # not manage.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    # Hard ceiling: two open pull requests, one per group below. Even if a
+    # month is missed, this cannot pile up.
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore"
+    labels:
+      - "dependencies"
+    # Do not rebase automatically. Rebases re-run CI and re-notify on every
+    # push to main, which is the single largest source of Dependabot noise on
+    # an actively developed repository.
+    rebase-strategy: "disabled"
+    groups:
+      # The HA test harness is separated from everything else on purpose: its
+      # bumps track Home Assistant core, so they are the ones that can
+      # legitimately fail (an entity-registry serialization change rewrites the
+      # syrupy snapshots, and an API removal breaks the integration outright).
+      # Isolating it means such a failure never blocks the routine tooling
+      # bumps sitting in the other group.
+      #
+      # Two things to check when this one opens:
+      #   1. Does its HA pin correspond to a STABLE core release? The newest
+      #      PHACC builds track betas; testing against a beta is a choice, not
+      #      a default.
+      #   2. If snapshots changed, is the diff representation-only, or did an
+      #      entity_id / unique_id actually move? The latter is a regression.
+      ha-test-harness:
+        patterns:
+          - "pytest-homeassistant-custom-component"
+      # Everything else: linting, snapshot assertions, the pinned msgpack.
+      # These are safe to take together and usually merge without thought.
+      dev-tools:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "pytest-homeassistant-custom-component"

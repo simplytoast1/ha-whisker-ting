@@ -3,17 +3,57 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+import logging
 from typing import Any
 
 import aiohttp
 
+from homeassistant.util import dt as dt_util
+
 from .auth import AuthenticationError, WhiskerAuth
-from .const import API_BASE_URL, API_USERS_ENDPOINT
+from .const import API_BASE_URL, API_NOTIFICATIONS_ENDPOINT, API_USERS_ENDPOINT
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def _reverse_mac(mac: str | None) -> str | None:
+    """Reverse the octet order of a MAC reported by the Ting API.
+
+    The API serializes both the Wi-Fi and Bluetooth MACs in reversed
+    (little-endian) byte order, so a device whose physical address is
+    ``80:6a:10:19:2a:b7`` is reported as ``b7:2a:19:10:6a:80``. Normalize
+    to physical order and return a lowercase,
+    colon-delimited string. The input is returned unchanged when it is missing
+    or not a parseable 6-octet MAC.
+    """
+    if not mac:
+        return mac
+    hex_only = mac.replace(":", "").replace("-", "").replace(".", "")
+    if len(hex_only) != 12:
+        return mac
+    try:
+        int(hex_only, 16)
+    except ValueError:
+        return mac
+    octets = [hex_only[i : i + 2] for i in range(0, 12, 2)]
+    return ":".join(reversed(octets)).lower()
+
+
+def _parse_aware_datetime(value: str | None) -> datetime | None:
+    """Parse an ISO datetime string, coercing a naive result to UTC.
+
+    All observed Ting API timestamps include a UTC offset, but a naive
+    result (missing offset) would blank a ``device_class=timestamp`` sensor
+    and risk a ``TypeError`` when compared against aware datetimes elsewhere.
+    """
+    if not value:
+        return None
+    parsed = dt_util.parse_datetime(value)
+    if parsed is not None and parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 @dataclass
@@ -65,12 +105,15 @@ class DeviceState:
     bluetooth_mac_address: str | None = None
     soc_serial_number: str | None = None
     station_id: str | None = None  # For WebSocket connection
+    subscription_start_date: str | None = None
 
     # Status flags
     is_fire: bool = False
     is_hvac_verified: bool = False
     has_frozen_pipe: bool = False
     is_owner: bool = False
+    # Site-level flag, joined from the device's site by siteId.
+    is_power_quality_hazard: bool = False
 
     # Hazard status
     fire_hazard_status: FireHazardStatus = field(default_factory=FireHazardStatus)
@@ -82,8 +125,8 @@ class DeviceState:
     group_name: str | None = None
     group_id: int | None = None
 
-    # Raw data for debugging
-    raw_data: dict[str, Any] = field(default_factory=dict)
+    site_name: str | None = None
+    notifications: list[TingNotification] = field(default_factory=list)
 
 
 @dataclass
@@ -100,6 +143,25 @@ class Site:
     country: str | None = None
     latitude: float | None = None
     longitude: float | None = None
+    is_power_quality_hazard: bool = False
+
+
+@dataclass
+class TingNotification:
+    """A Ting notification (alert)."""
+
+    id: str
+    event_type: str
+    event_category: str | None = None
+    title: str | None = None
+    subtitle: str | None = None
+    message: str | None = None
+    timestamp: datetime | None = None  # from eventTimestampLocal (tz-aware)
+    sent_utc: datetime | None = None
+    serial_number: str | None = None
+    site_id: int | None = None
+    is_acknowledged: bool = False
+    is_cleared: bool = False
 
 
 @dataclass
@@ -164,19 +226,23 @@ class WhiskerApiClient:
     async def _ensure_token(self) -> str:
         """Ensure we have a valid access token."""
         async with self._lock:
-            if self._access_token and self._token_expiry:
-                # Refresh if token expires in less than 5 minutes
-                if datetime.now() < self._token_expiry - timedelta(minutes=5):
-                    return self._access_token
+            # Refresh if token expires in less than 5 minutes
+            if (
+                self._access_token
+                and self._token_expiry
+                and dt_util.utcnow() < self._token_expiry - timedelta(minutes=5)
+            ):
+                return self._access_token
 
             # Need to authenticate or refresh
             if self._refresh_token:
                 try:
                     await self._refresh_access_token()
-                    return self._access_token
                 except AuthenticationError:
                     # Refresh failed, try full auth
                     pass
+                else:
+                    return self._access_token
 
             # Full authentication
             await self._authenticate()
@@ -192,8 +258,9 @@ class WhiskerApiClient:
             self._refresh_token = result["refresh_token"]
             self._id_token = result["id_token"]
 
-            # Token expires in 1 hour typically
-            self._token_expiry = datetime.now() + timedelta(hours=1)
+            # Use the lifetime Cognito reports rather than assuming one hour.
+            expires_in = int(result.get("expires_in", 3600))
+            self._token_expiry = dt_util.utcnow() + timedelta(seconds=expires_in)
 
             # Extract user info from attributes
             user_attrs = {
@@ -216,7 +283,8 @@ class WhiskerApiClient:
 
             self._access_token = result["AccessToken"]
             self._id_token = result.get("IdToken", self._id_token)
-            self._token_expiry = datetime.now() + timedelta(hours=1)
+            expires_in = int(result.get("ExpiresIn", 3600))
+            self._token_expiry = dt_util.utcnow() + timedelta(seconds=expires_in)
 
             _LOGGER.debug("Access token refreshed")
 
@@ -281,12 +349,9 @@ class WhiskerApiClient:
 
     def _parse_user_data(self, data: dict[str, Any]) -> UserData:
         """Parse user data from API response."""
-        devices = []
-        for device_data in data.get("devices", []):
-            device = self._parse_device(device_data)
-            devices.append(device)
-
+        # Parse sites first so device parsing can join site-level fields.
         sites = []
+        site_map: dict[int, Site] = {}
         for site_data in data.get("sites", []):
             site = Site(
                 id=site_data.get("id", 0),
@@ -299,8 +364,15 @@ class WhiskerApiClient:
                 country=site_data.get("country"),
                 latitude=site_data.get("latitude"),
                 longitude=site_data.get("longitude"),
+                is_power_quality_hazard=site_data.get("isPowerQualityHazard", False),
             )
             sites.append(site)
+            site_map[site.id] = site
+
+        devices = []
+        for device_data in data.get("devices", []):
+            device = self._parse_device(device_data, site_map)
+            devices.append(device)
 
         return UserData(
             user_id=data.get("id", 0),
@@ -312,7 +384,9 @@ class WhiskerApiClient:
             sites=sites,
         )
 
-    def _parse_device(self, data: dict[str, Any]) -> DeviceState:
+    def _parse_device(
+        self, data: dict[str, Any], site_map: dict[int, Site] | None = None
+    ) -> DeviceState:
         """Parse device state from API response."""
         # Parse fire hazard status
         fhs_data = data.get("fireHazardStatus", {})
@@ -352,24 +426,32 @@ class WhiskerApiClient:
         # Get station_id for WebSocket - it's the serial number
         station_id = data.get("serialNumber", "")
 
+        # Join site-level fields from the device's site.
+        site_id = data.get("siteId", 0)
+        site = (site_map or {}).get(site_id)
+
         return DeviceState(
             serial_number=data.get("serialNumber", ""),
             name=data.get("name", data.get("serialNumber", "")),
             device_type=data.get("type", "Unknown"),
-            site_id=data.get("siteId", 0),
+            site_id=site_id,
             version=data.get("version"),
-            wifi_mac_address=data.get("wifiMacAddress"),
-            bluetooth_mac_address=data.get("bluetoothMacAddress"),
+            wifi_mac_address=_reverse_mac(data.get("wifiMacAddress")),
+            bluetooth_mac_address=_reverse_mac(data.get("bluetoothMacAddress")),
             soc_serial_number=data.get("socSerialNumber"),
             station_id=station_id,
+            subscription_start_date=data.get("subscriptionStartDate"),
             is_fire=data.get("isFire", False),
             is_hvac_verified=data.get("isHvacVerified", False),
             has_frozen_pipe=data.get("hasFrozenPipe", False),
             is_owner=data.get("isOwner", False),
+            is_power_quality_hazard=bool(site.is_power_quality_hazard)
+            if site
+            else False,
+            site_name=site.display_name if site else None,
             fire_hazard_status=fire_hazard_status,
             group_name=group_data.get("name"),
             group_id=group_data.get("id"),
-            raw_data=data,
         )
 
     async def get_all_device_states(self) -> dict[str, DeviceState]:
@@ -377,10 +459,30 @@ class WhiskerApiClient:
         user_data = await self.get_user_data()
         return {device.serial_number: device for device in user_data.devices}
 
-    async def test_connection(self) -> bool:
-        """Test the connection to the API."""
-        try:
-            await self.get_user_data()
-            return True
-        except WhiskerApiError:
-            return False
+    async def get_notifications(self) -> list[TingNotification]:
+        """Get the account's recent notifications (alerts)."""
+        if not self._user_id:
+            await self._ensure_token()
+        endpoint = API_NOTIFICATIONS_ENDPOINT.format(user_id=self._user_id)
+        data = await self._request("GET", endpoint)
+        if not isinstance(data, list):
+            return []
+        return [self._parse_notification(item) for item in data]
+
+    @staticmethod
+    def _parse_notification(data: dict[str, Any]) -> TingNotification:
+        """Parse one notification from the API."""
+        return TingNotification(
+            id=data.get("id", ""),
+            event_type=data.get("eventType", "unknown"),
+            event_category=data.get("eventCategory"),
+            title=data.get("title"),
+            subtitle=data.get("subtitle"),
+            message=data.get("message"),
+            timestamp=_parse_aware_datetime(data.get("eventTimestampLocal")),
+            sent_utc=_parse_aware_datetime(data.get("sentUtc")),
+            serial_number=data.get("serialNumber"),
+            site_id=data.get("siteId"),
+            is_acknowledged=data.get("isAcknowledged", False),
+            is_cleared=data.get("isCleared", False),
+        )

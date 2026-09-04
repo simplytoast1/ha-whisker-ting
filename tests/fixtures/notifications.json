@@ -1,0 +1,62 @@
+[
+  {
+    "id": "n-outage-1",
+    "userId": 12345,
+    "eventType": "PowerOutage",
+    "eventCategory": "PowerQuality",
+    "title": "Power Outage",
+    "subtitle": "Power Outage",
+    "message": "Ting has detected a Power Outage at Living Room.",
+    "eventTimestampLocal": "2026-07-20T20:05:12.942-04:00",
+    "sentUtc": "2026-07-21T00:05:21.978121Z",
+    "serialNumber": "TG-0001",
+    "siteId": 1,
+    "isAcknowledged": false,
+    "isCleared": false
+  },
+  {
+    "id": "n-restore-1",
+    "userId": 12345,
+    "eventType": "PowerRestored",
+    "eventCategory": "PowerQuality",
+    "title": "Power Restoration",
+    "subtitle": "Power Restoration",
+    "message": "Power has been restored at Living Room.",
+    "eventTimestampLocal": "2026-07-20T20:25:08.643-04:00",
+    "sentUtc": "2026-07-21T00:25:27.338371Z",
+    "serialNumber": "TG-0001",
+    "siteId": 1,
+    "isAcknowledged": false,
+    "isCleared": false
+  },
+  {
+    "id": "n-sag-1",
+    "userId": 12345,
+    "eventType": "Sag",
+    "eventCategory": "PowerQuality",
+    "title": "Power Brownout",
+    "subtitle": "Power Brownout",
+    "message": "Ting has detected a Power Brownout. The voltage dropped to 107.5V.",
+    "eventTimestampLocal": "2026-07-19T18:55:00.629-04:00",
+    "sentUtc": "2026-07-19T22:55:21.479614Z",
+    "serialNumber": "TG-0001",
+    "siteId": 1,
+    "isAcknowledged": true,
+    "isCleared": false
+  },
+  {
+    "id": "n-weather-1",
+    "userId": 12345,
+    "eventType": "WeatherAlert",
+    "eventCategory": "PowerGrid",
+    "title": "Severe Thunderstorm Warning",
+    "subtitle": "Severe Thunderstorm Warning",
+    "message": "The National Weather Service has issued a Severe Thunderstorm Warning.",
+    "eventTimestampLocal": "2026-07-18T15:01:00-04:00",
+    "sentUtc": "2026-07-18T19:02:35.105186Z",
+    "serialNumber": "TG-0001",
+    "siteId": 1,
+    "isAcknowledged": false,
+    "isCleared": false
+  }
+]

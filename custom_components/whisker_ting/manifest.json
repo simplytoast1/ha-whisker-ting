@@ -1,13 +1,17 @@
 {
   "domain": "whisker_ting",
   "name": "Whisker Ting",
-  "codeowners": ["@simplytoast1"],
+  "codeowners": [
+    "@jasonjhofmann"
+  ],
   "config_flow": true,
   "dependencies": [],
-  "documentation": "https://github.com/simplytoast1/ha-whisker-ting",
-  "integration_type": "service",
+  "documentation": "https://github.com/jasonjhofmann/ha-whisker-ting",
+  "integration_type": "hub",
   "iot_class": "cloud_push",
-  "issue_tracker": "https://github.com/simplytoast1/ha-whisker-ting/issues",
-  "requirements": ["aiohttp>=3.8.0", "msgpack>=1.0.0"],
-  "version": "1.0.1"
+  "issue_tracker": "https://github.com/jasonjhofmann/ha-whisker-ting/issues",
+  "requirements": [
+    "msgpack>=1.0.0"
+  ],
+  "version": "3.3.2"
 }

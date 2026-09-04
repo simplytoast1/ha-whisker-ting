@@ -1,0 +1,47 @@
+{
+  "id": 12345,
+  "email": "ada@example.com",
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "phoneNumber": "+15555550123",
+  "sites": [
+    {
+      "id": 1,
+      "userId": 12345,
+      "displayName": "Home",
+      "addressLine1": "1 Analytical Engine Way",
+      "city": "London",
+      "stateProvince": "LDN",
+      "postalCode": "EC1",
+      "country": "UK",
+      "latitude": 51.5,
+      "longitude": -0.12,
+      "isPowerQualityHazard": false
+    }
+  ],
+  "devices": [
+    {
+      "serialNumber": "TG-0001",
+      "name": "Living Room",
+      "type": "FireSensor",
+      "siteId": 1,
+      "version": "1.2.3",
+      "wifiMacAddress": "b7:2a:19:10:6a:80",
+      "bluetoothMacAddress": "aa:bb:cc:dd:ee:ff",
+      "socSerialNumber": "SOC-9",
+      "subscriptionStartDate": "2024-01-15T00:00:00Z",
+      "isFire": false,
+      "isHvacVerified": true,
+      "hasFrozenPipe": false,
+      "isOwner": true,
+      "fireHazardStatus": {
+        "learningMode": false,
+        "message": "No Hazards Detected",
+        "efhStatus": {"status": null, "timestampUtc": null, "level": 0, "message": "No Hazards Detected", "hexColor": "#00FF00"},
+        "ufhStatus": {"status": null, "timestampUtc": null, "level": 0, "message": "No Hazards Detected", "hexColor": "#00FF00"},
+        "hexColor": {"light": "#00FF00", "medium": "#358C15", "dark": "#233016"}
+      },
+      "group": {"id": 7, "name": "Downstairs"}
+    }
+  ]
+}

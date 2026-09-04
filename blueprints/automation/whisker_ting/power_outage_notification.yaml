@@ -1,0 +1,55 @@
+blueprint:
+  name: Ting power outage notification
+  description: >-
+    Send a notification when a Ting sensor reports a power outage (and,
+    optionally, when power is restored).
+  domain: automation
+  source_url: https://github.com/jasonjhofmann/ha-whisker-ting/blob/main/blueprints/automation/whisker_ting/power_outage_notification.yaml
+  input:
+    power_outage_sensor:
+      name: Power outage sensor
+      description: The Ting "Power outage" binary sensor for the device.
+      selector:
+        entity:
+          filter:
+            integration: whisker_ting
+            domain: binary_sensor
+    notify_target:
+      name: Notify service
+      description: The notify service to call (e.g. notify.mobile_app_phone).
+      selector:
+        text: {}
+    notify_on_restore:
+      name: Also notify on restoration
+      default: true
+      selector:
+        boolean: {}
+
+mode: queued
+trigger:
+  - platform: state
+    entity_id: !input power_outage_sensor
+    to: "on"
+    id: outage
+  - platform: state
+    entity_id: !input power_outage_sensor
+    to: "off"
+    id: restored
+action:
+  - choose:
+      - conditions: "{{ trigger.id == 'outage' }}"
+        sequence:
+          - action: !input notify_target
+            data:
+              title: Power outage
+              message: >-
+                {{ state_attr(trigger.entity_id, 'friendly_name') }} reports a power outage.
+      - conditions:
+          - "{{ trigger.id == 'restored' }}"
+          - !input notify_on_restore
+        sequence:
+          - action: !input notify_target
+            data:
+              title: Power restored
+              message: >-
+                {{ state_attr(trigger.entity_id, 'friendly_name') }} power is back.

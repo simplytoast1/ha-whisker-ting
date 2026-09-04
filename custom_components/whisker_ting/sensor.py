@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -12,16 +11,20 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory, UnitOfElectricPotential
-from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
-from .api import DeviceState
-from .const import DOMAIN
-from .coordinator import WhiskerDataUpdateCoordinator
+from .const import BROWNOUT_EVENT_TYPES, WEATHER_EVENT_TYPES
+from .entity import WhiskerEntity
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from .api import DeviceState, TingNotification
 
 PARALLEL_UPDATES = 0  # Coordinator handles all updates
 
@@ -31,6 +34,11 @@ class WhiskerSensorEntityDescription(SensorEntityDescription):
     """Describes a Whisker Ting sensor entity."""
 
     value_fn: Callable[[DeviceState], Any]
+    # True for sensors fed by the real-time WebSocket stream; these go
+    # unavailable when the stream is disconnected/stale rather than showing a
+    # frozen last value forever.
+    realtime: bool = False
+    attributes_fn: Callable[[DeviceState], dict[str, Any] | None] | None = None
 
 
 SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
@@ -42,7 +50,10 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=2,
-        value_fn=lambda state: state.voltage.voltage if state.voltage.voltage > 0 else None,
+        realtime=True,
+        value_fn=lambda state: (
+            state.voltage.voltage if state.voltage.voltage > 0 else None
+        ),
     ),
     WhiskerSensorEntityDescription(
         key="voltage_high",
@@ -51,7 +62,10 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=2,
-        value_fn=lambda state: state.voltage.voltage_hi if state.voltage.voltage_hi > 0 else None,
+        realtime=True,
+        value_fn=lambda state: (
+            state.voltage.voltage_hi if state.voltage.voltage_hi > 0 else None
+        ),
     ),
     WhiskerSensorEntityDescription(
         key="voltage_low",
@@ -60,7 +74,10 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=2,
-        value_fn=lambda state: state.voltage.voltage_lo if state.voltage.voltage_lo > 0 else None,
+        realtime=True,
+        value_fn=lambda state: (
+            state.voltage.voltage_lo if state.voltage.voltage_lo > 0 else None
+        ),
     ),
     WhiskerSensorEntityDescription(
         key="average_peaks_max",
@@ -70,7 +87,12 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         native_unit_of_measurement=UnitOfElectricPotential.VOLT,
         suggested_display_precision=2,
         entity_registry_enabled_default=False,
-        value_fn=lambda state: state.voltage.average_peaks_max if state.voltage.average_peaks_max > 0 else None,
+        realtime=True,
+        value_fn=lambda state: (
+            state.voltage.average_peaks_max
+            if state.voltage.average_peaks_max > 0
+            else None
+        ),
     ),
     # Primary status sensors (enabled by default)
     WhiskerSensorEntityDescription(
@@ -78,7 +100,10 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         translation_key="hazard_status",
         device_class=SensorDeviceClass.ENUM,
         options=["no_hazards", "hazard_detected", "reviewed_not_fire", "learning"],
-        value_fn=lambda state: _get_hazard_status(state),
+        # Not just an unnecessary wrapper: _get_hazard_status is defined below
+        # this tuple, so a direct reference would be a NameError at module
+        # load; the lambda defers the lookup to call time.
+        value_fn=lambda state: _get_hazard_status(state),  # noqa: PLW0108
     ),
     WhiskerSensorEntityDescription(
         key="hazard_message",
@@ -147,13 +172,69 @@ SENSOR_DESCRIPTIONS: tuple[WhiskerSensorEntityDescription, ...] = (
         value_fn=lambda state: state.serial_number,
     ),
     WhiskerSensorEntityDescription(
+        key="subscription_start",
+        translation_key="subscription_start",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda state: (
+            dt_util.parse_datetime(state.subscription_start_date)
+            if state.subscription_start_date
+            else None
+        ),
+    ),
+    WhiskerSensorEntityDescription(
         key="group_name",
         translation_key="group_name",
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda state: state.group_name,
     ),
+    # Recency-of-event sensors: state is the timestamp of the most recent
+    # matching notification, with details in attributes.
+    WhiskerSensorEntityDescription(
+        key="last_brownout",
+        translation_key="last_brownout",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda s: (
+            n.timestamp
+            if (n := _latest_notification_of(s, BROWNOUT_EVENT_TYPES))
+            else None
+        ),
+        attributes_fn=lambda s: (
+            {"message": n.message}
+            if (n := _latest_notification_of(s, BROWNOUT_EVENT_TYPES))
+            else None
+        ),
+    ),
+    WhiskerSensorEntityDescription(
+        key="last_weather_alert",
+        translation_key="last_weather_alert",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda s: (
+            n.timestamp
+            if (n := _latest_notification_of(s, WEATHER_EVENT_TYPES))
+            else None
+        ),
+        attributes_fn=lambda s: (
+            {"title": n.title, "message": n.message}
+            if (n := _latest_notification_of(s, WEATHER_EVENT_TYPES))
+            else None
+        ),
+    ),
 )
+
+
+def _latest_notification_of(
+    state: DeviceState, types: set[str]
+) -> TingNotification | None:
+    """Return the most recent notification of the given event types, if any."""
+    matching = [
+        n
+        for n in state.notifications
+        if n.event_type in types and n.timestamp is not None
+    ]
+    return max(matching, key=lambda n: n.timestamp) if matching else None
 
 
 def _get_hazard_status(state: DeviceState) -> str:
@@ -181,60 +262,43 @@ async def async_setup_entry(
     """Set up Whisker Ting sensors from a config entry."""
     coordinator = entry.runtime_data
 
-    entities: list[WhiskerSensor] = []
-    for device_id, device_state in coordinator.data.items():
-        for description in SENSOR_DESCRIPTIONS:
-            entities.append(
-                WhiskerSensor(
-                    coordinator=coordinator,
-                    device_id=device_id,
-                    description=description,
-                )
-            )
+    entities: list[WhiskerSensor] = [
+        WhiskerSensor(
+            coordinator=coordinator, device_id=device_id, description=description
+        )
+        for device_id in coordinator.data
+        for description in SENSOR_DESCRIPTIONS
+    ]
 
     async_add_entities(entities)
 
 
-class WhiskerSensor(CoordinatorEntity[WhiskerDataUpdateCoordinator], SensorEntity):
+class WhiskerSensor(WhiskerEntity, SensorEntity):
     """Representation of a Whisker Ting sensor."""
 
     entity_description: WhiskerSensorEntityDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
-        coordinator: WhiskerDataUpdateCoordinator,
+        coordinator,
         device_id: str,
         description: WhiskerSensorEntityDescription,
     ) -> None:
         """Initialize the sensor."""
-        super().__init__(coordinator)
+        super().__init__(coordinator, device_id)
         self.entity_description = description
-        self._device_id = device_id
         self._attr_unique_id = f"{device_id}_{description.key}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return device information."""
-        device_state = self.coordinator.data.get(self._device_id)
-        if device_state:
-            return DeviceInfo(
-                identifiers={(DOMAIN, self._device_id)},
-                name=device_state.name,
-                manufacturer="Whisker Labs",
-                model="Ting Fire Sensor",
-                sw_version=device_state.version,
-            )
-        return DeviceInfo(
-            identifiers={(DOMAIN, self._device_id)},
-            name=self._device_id,
-            manufacturer="Whisker Labs",
-        )
 
     @property
     def available(self) -> bool:
         """Return if entity is available."""
-        return super().available and self._device_id in self.coordinator.data
+        if not super().available:
+            return False
+        # Real-time voltage sensors depend on a live WebSocket stream; report
+        # unavailable when it is disconnected/stale instead of a frozen value.
+        if self.entity_description.realtime:
+            return self.coordinator.voltage_is_live(self._device_id)
+        return True
 
     @property
     def native_value(self) -> Any:
@@ -243,3 +307,13 @@ class WhiskerSensor(CoordinatorEntity[WhiskerDataUpdateCoordinator], SensorEntit
         if device_state is None:
             return None
         return self.entity_description.value_fn(device_state)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """Return additional notification details, if the description provides any."""
+        if self.entity_description.attributes_fn is None:
+            return None
+        device_state = self.coordinator.data.get(self._device_id)
+        if device_state is None:
+            return None
+        return self.entity_description.attributes_fn(device_state)

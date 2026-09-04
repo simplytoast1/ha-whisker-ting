@@ -1,0 +1,14 @@
+{
+  "id": 12345,
+  "email": "ada@example.com",
+  "firstName": "Ada",
+  "lastName": "Lovelace",
+  "sites": [
+    {"id": 1, "userId": 12345, "displayName": "Home - Kitchen", "isPowerQualityHazard": false},
+    {"id": 2, "userId": 12345, "displayName": "Home - Bedroom", "isPowerQualityHazard": false}
+  ],
+  "devices": [
+    {"serialNumber": "TG-0001", "name": "DAlessandro Residence", "type": "FireSensor", "siteId": 1, "version": "2.1.4", "isFire": false, "fireHazardStatus": {"message": "No Hazards Detected", "efhStatus": {}, "ufhStatus": {}, "hexColor": {}}, "group": {}},
+    {"serialNumber": "TG-0002", "name": "DAlessandro Residence", "type": "FireSensor", "siteId": 2, "version": "2.1.4", "isFire": false, "fireHazardStatus": {"message": "No Hazards Detected", "efhStatus": {}, "ufhStatus": {}, "hexColor": {}}, "group": {}}
+  ]
+}

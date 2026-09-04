@@ -1,0 +1,31 @@
+# Pinned to the HA core version this integration is tested against.
+# 0.13.348 -> homeassistant==2026.7.4, matching the deployment. Keeping this
+# aligned with the running core is the point of the pin: it is the only thing
+# that catches HA API changes before they reach production.
+#
+# NOTE: the newest PHACC releases track HA *beta* cores (0.13.353 pins
+# 2026.8.0b5). Prefer the newest release whose HA pin is a stable version.
+pytest-homeassistant-custom-component==0.13.348
+
+# Snapshot assertions. 5.3.x changes how sets are serialized, so a bump here
+# rewrites tests/snapshots/*.ambr even when nothing about the integration
+# changed -- review such diffs for entity_id/unique_id churn, which would be
+# a real regression, versus pure representation changes, which are not.
+syrupy==5.3.2
+
+# Runtime requirement from custom_components/whisker_ting/manifest.json
+# (msgpack>=1.0.0; pinned exactly here for test reproducibility).
+# HA normally installs manifest requirements itself; PHACC's test harness does
+# not, so it's listed here too -- importing custom_components.whisker_ting.api
+# otherwise fails at collection time via __init__ -> coordinator -> websocket.
+msgpack==1.2.1
+
+# Linter/formatter -- PINNED so CI matches local exactly. The workflow
+# previously installed an unpinned "ruff", which pulled a newer release that
+# enabled a lint rule the local ruff didn't, breaking CI while local passed.
+ruff==0.16.1
+
+# NOTE: aioresponses was removed in favour of Home Assistant's own
+# `aioclient_mock` fixture. aioresponses cannot construct a ClientResponse on
+# aiohttp 3.14+ (shipped by HA 2026.7) because it does not pass the
+# now-required stream_writer argument, and upstream 0.7.9 is still affected.

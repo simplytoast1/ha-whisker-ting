@@ -1,0 +1,120 @@
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: |
+      The integration registers no custom service actions.
+  appropriate-polling: done
+  brands:
+    status: done
+    comment: |
+      Brand assets ship in-tree at custom_components/whisker_ting/brand/
+      (icon.png, logo.png). home-assistant/brands PRs for custom
+      integrations auto-close since HA 2026.3.0, so in-tree is the
+      correct final state, not a stopgap.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: |
+      No custom actions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  entity-event-setup:
+    status: exempt
+    comment: |
+      Real-time data is delivered through the coordinator, not per-entity
+      library event callbacks.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions:
+    status: exempt
+    comment: |
+      No custom actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: done
+    comment: |
+      Handled by the DataUpdateCoordinator.
+  parallel-updates: done
+  reauthentication-flow: done
+  test-coverage:
+    status: todo
+    comment: |
+      config_flow.py is at 100%; overall coverage is not yet certified >=95%.
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: |
+      Cloud service; there is no local device to discover.
+  discovery-update-info:
+    status: exempt
+    comment: |
+      No discovery.
+  docs-data-update:
+    status: todo
+  docs-examples:
+    status: todo
+  docs-known-limitations:
+    status: todo
+  docs-supported-devices:
+    status: todo
+  docs-supported-functions:
+    status: todo
+  docs-troubleshooting: done
+  docs-use-cases:
+    status: todo
+  dynamic-devices:
+    status: todo
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations:
+    status: todo
+    comment: |
+      Most entities use translation_key, but several sensors still pass
+      hardcoded name= (voltage, voltage_high, voltage_low,
+      average_peaks_max, efh_level). Migrating them is pending; strings
+      must match the current names exactly to avoid renaming entities.
+  exception-translations:
+    status: exempt
+    comment: |
+      The integration raises no translated user-facing exceptions.
+  icon-translations:
+    status: todo
+  reconfiguration-flow:
+    status: todo
+  repair-issues:
+    status: exempt
+    comment: |
+      No repairable issues are surfaced.
+  stale-devices:
+    status: todo
+
+  # Platinum
+  async-dependency:
+    status: todo
+    comment: |
+      msgpack is a synchronous (CPU-only) packer; the rest of the integration
+      is async.
+  inject-websession: done
+  strict-typing:
+    status: todo
+    comment: |
+      No mypy strict-typing gate is configured yet.

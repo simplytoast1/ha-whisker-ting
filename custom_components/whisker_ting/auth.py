@@ -9,11 +9,12 @@ import hashlib
 import hmac
 import logging
 import os
-from typing import Any
-
-import aiohttp
+from typing import TYPE_CHECKING, Any
 
 from .const import COGNITO_CLIENT_ID, COGNITO_REGION, COGNITO_USER_POOL_ID
+
+if TYPE_CHECKING:
+    import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,7 +44,20 @@ G_HEX = "2"
 INFO_BITS = bytearray("Caldera Derived Key", "utf-8")
 
 WEEKDAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+MONTH_NAMES = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+]
 
 
 class AuthenticationError(Exception):
@@ -79,10 +93,7 @@ def get_random(nbytes: int) -> int:
 
 def pad_hex(long_int: int | str) -> str:
     """Pad hex string with leading zeros if needed."""
-    if not isinstance(long_int, str):
-        hash_str = long_to_hex(long_int)
-    else:
-        hash_str = long_int
+    hash_str = long_to_hex(long_int) if not isinstance(long_int, str) else long_int
     if len(hash_str) % 2 == 1:
         hash_str = f"0{hash_str}"
     elif hash_str[0] in "89ABCDEFabcdef":
@@ -173,11 +184,10 @@ class CognitoSRP:
         g_mod_pow_xn = pow(self.val_g, x_value, self.big_n)
         int_value2 = server_b_value - self.val_k * g_mod_pow_xn
         s_value = pow(int_value2, self.small_a_value + u_value * x_value, self.big_n)
-        hkdf = compute_hkdf(
+        return compute_hkdf(
             bytearray.fromhex(pad_hex(s_value)),
             bytearray.fromhex(pad_hex(long_to_hex(u_value))),
         )
-        return hkdf
 
     def process_challenge(
         self, challenge_parameters: dict[str, str], request_parameters: dict[str, str]
@@ -257,6 +267,7 @@ class WhiskerAuth:
             "access_token": tokens["AccessToken"],
             "id_token": tokens["IdToken"],
             "refresh_token": tokens["RefreshToken"],
+            "expires_in": tokens.get("ExpiresIn", 3600),
             "user_attributes": user_info.get("UserAttributes", []),
         }
 
@@ -329,7 +340,9 @@ class WhiskerAuth:
             "ClientId": COGNITO_CLIENT_ID,
         }
 
-        _LOGGER.debug("Responding to challenge for user: %s", challenge_response.get("USERNAME"))
+        _LOGGER.debug(
+            "Responding to challenge for user: %s", challenge_response.get("USERNAME")
+        )
         async with self._session.post(
             COGNITO_IDP_URL, json=payload, headers=headers
         ) as resp:

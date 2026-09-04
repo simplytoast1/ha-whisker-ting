@@ -25,7 +25,8 @@
     },
     "abort": {
       "already_configured": "This account is already configured",
-      "reauth_successful": "Reauthentication successful"
+      "reauth_successful": "Reauthentication successful",
+      "wrong_account": "The credentials are for a different Whisker Ting account than the one being reauthenticated."
     }
   },
   "options": {
@@ -33,10 +34,14 @@
       "init": {
         "title": "Configure Whisker Ting",
         "data": {
-          "scan_interval": "Update interval (seconds)"
+          "scan_interval": "Update interval (seconds)",
+          "alert_notifications": "Create Home Assistant notifications for alerts",
+          "voltage_publish_interval": "Real-time voltage publish interval (seconds)"
         },
         "data_description": {
-          "scan_interval": "How often to poll the Whisker Ting API for updates (30-3600 seconds)"
+          "scan_interval": "How often to poll the Whisker Ting API for updates (30-3600 seconds)",
+          "alert_notifications": "Post a Home Assistant notification when a significant Ting alert (e.g. a power outage) arrives.",
+          "voltage_publish_interval": "How often the live voltage stream (~4 samples/second) writes to Home Assistant state. Lower values give finer history at the cost of recorder growth."
         }
       }
     }
@@ -50,10 +55,19 @@
         "name": "Electrical Fire Hazard"
       },
       "unverified_fire_hazard": {
-        "name": "Unverified Fire Hazard"
+        "name": "Utility Fire Hazard"
       },
       "frozen_pipe": {
         "name": "Frozen Pipe Risk"
+      },
+      "power_quality_hazard": {
+        "name": "Power Quality Hazard"
+      },
+      "power_outage": {
+        "name": "Power outage"
+      },
+      "connectivity": {
+        "name": "Connectivity"
       },
       "learning_mode": {
         "name": "Learning Mode"
@@ -63,6 +77,11 @@
       },
       "is_owner": {
         "name": "Is Owner"
+      }
+    },
+    "event": {
+      "alerts": {
+        "name": "Alerts"
       }
     },
     "sensor": {
@@ -88,10 +107,10 @@
         "name": "Electrical Fire Hazard Level"
       },
       "ufh_status": {
-        "name": "Unverified Fire Hazard Status"
+        "name": "Utility Fire Hazard Status"
       },
       "ufh_message": {
-        "name": "Unverified Fire Hazard Message"
+        "name": "Utility Fire Hazard Message"
       },
       "device_type": {
         "name": "Device Type"
@@ -108,8 +127,17 @@
       "serial_number": {
         "name": "Serial Number"
       },
+      "subscription_start": {
+        "name": "Subscription Start"
+      },
       "group_name": {
         "name": "Group"
+      },
+      "last_brownout": {
+        "name": "Last brownout"
+      },
+      "last_weather_alert": {
+        "name": "Last weather alert"
       }
     }
   }
