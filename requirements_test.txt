@@ -5,7 +5,7 @@
 #
 # NOTE: the newest PHACC releases track HA *beta* cores (0.13.353 pins
 # 2026.8.0b5). Prefer the newest release whose HA pin is a stable version.
-pytest-homeassistant-custom-component==0.13.348
+pytest-homeassistant-custom-component==0.13.361
 
 # Snapshot assertions. 5.3.x changes how sets are serialized, so a bump here
 # rewrites tests/snapshots/*.ambr even when nothing about the integration
